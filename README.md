@@ -1,1 +1,1 @@
-# Neural-Network-for-recognizing-handwritten-Digits-in-C
+# MNIST Digit Recognizer in C
