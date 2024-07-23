@@ -17,8 +17,20 @@ The project uses the MNIST dataset from Kaggle. Place the following files in the
 ## Compilation
 
 To compile the project, use the following command:
-## Running the Program
+
+```bash
+make build
+```
+
+Alternatively you can also run the following command:
+
+```bash
 gcc main.c neuralNetwork.c utils.c -o mnist_recognizer -lm
+```
+
+This will generate the binary `mnist_recognizer`.
+
+## Running the Program
 
 After compilation, run the program with:
 ./mnist_recognizer
