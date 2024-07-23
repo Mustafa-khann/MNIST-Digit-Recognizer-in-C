@@ -11,7 +11,6 @@ void loadMNISTData(const char *trainFile, const char *testFile, double **trainin
     FILE *file;
     char line[MAX_LINE_LENGTH];
     char *token;
-    int i , j;
 
     file = fopen(trainFile, "r");
     if(file == NULL)
@@ -22,7 +21,7 @@ void loadMNISTData(const char *trainFile, const char *testFile, double **trainin
 
     fgets(line, MAX_LINE_LENGTH, file);
 
-    for(int i; i<trainingSize; i++)
+    for(int i =  0; i<trainingSize; i++)
         {
             fgets(line, MAX_LINE_LENGTH, file);
 

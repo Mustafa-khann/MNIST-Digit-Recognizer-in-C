@@ -1,244 +1,264 @@
-#include <any>
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
-#include <float.h>
 #include "neuralNetwork.h"
 
-// Activation function: ReLU (Rectified Linear Unit)
+#define DEBUG_PRINT(fmt, ...) printf("%s:%d: " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
+
 double relu(double x)
 {
-    return x > 0 ? x : 0; // Return x if it's positive, otherwise return 0
+    return x > 0 ? x : 0;
 }
 
-// Derivative of the ReLU function
 double reluDerivative(double x)
 {
-    return x > 0 ? 1 : 0; // Return 1 if x is positive, otherwise return 0
+    return x > 0 ? 1 : 0;
 }
 
-// Softmax function to normalize the input array
 void softmax(double* input, int size)
 {
-    double max = -DBL_MAX; // Initialize max to the smallest possible double value
-    for (int i = 0; i < size; i++) // Fix the loop limit from DBL_MAX to size
+    double max = input[0];
+    for(int i = 1; i < size; i++)
     {
         if (input[i] > max)
         {
-            max = input[i]; // Find the maximum value in the input array
+            max = input[i];
         }
     }
 
     double sum = 0.0;
-    for (int i = 0; i < size; i++)
+    for(int i = 0; i < size; i++)
     {
-        input[i] = exp(input[i] - max); // Exponentiate each input value (stabilized by subtracting max)
-        sum += input[i]; // Sum up all the exponentiated values
+        input[i] = exp(input[i] - max);
+        sum += input[i];
     }
-
-    for (int i = 0; i < size; i++)
+    for(int i = 0; i < size; i++)
     {
-        input[i] /= sum; // Normalize each value by dividing by the sum
+        input[i] /= sum;
     }
 }
 
-// Function to create and initialize a new neural network
 NeuralNetwork* createNeuralNetwork(int inputSize, int hiddenSize, int outputSize)
 {
-    NeuralNetwork *nn = (NeuralNetwork *)malloc(sizeof(NeuralNetwork)); // Allocate memory for the neural network
+    DEBUG_PRINT("Creating neural network with input: %d, hidden: %d, output: %d", inputSize, hiddenSize, outputSize);
+
+    NeuralNetwork *nn = (NeuralNetwork *)malloc(sizeof(NeuralNetwork));
+    if (nn == NULL) {
+        DEBUG_PRINT("Failed to allocate memory for neural network");
+        return NULL;
+    }
+
     nn->inputSize = inputSize;
     nn->hiddenSize = hiddenSize;
     nn->outputSize = outputSize;
 
-    // Allocate memory for hidden layer weights
     nn->hiddenWeights = (double **)malloc(inputSize * sizeof(double *));
-    for (int i = 0; i < inputSize; i++)
+    if (nn->hiddenWeights == NULL) {
+        DEBUG_PRINT("Failed to allocate memory for hidden weights");
+        free(nn);
+        return NULL;
+    }
+
+    for(int i = 0; i < inputSize; i++)
     {
         nn->hiddenWeights[i] = (double *)malloc(hiddenSize * sizeof(double));
-        for (int j = 0; j < hiddenSize; j++)
+        if (nn->hiddenWeights[i] == NULL) {
+            DEBUG_PRINT("Failed to allocate memory for hidden weights row %d", i);
+            for (int j = 0; j < i; j++) free(nn->hiddenWeights[j]);
+            free(nn->hiddenWeights);
+            free(nn);
+            return NULL;
+        }
+        for(int j = 0; j < hiddenSize; j++)
         {
-            nn->hiddenWeights[i][j] = ((double)rand() / RAND_MAX) * 2 - 1; // Initialize weights randomly between -1 and 1
+            nn->hiddenWeights[i][j] = ((double)rand() / RAND_MAX) * 2 - 1;
         }
     }
 
-    // Allocate memory for output layer weights
     nn->outputWeights = (double **)malloc(hiddenSize * sizeof(double *));
-    for (int i = 0; i < hiddenSize; i++)
+    if (nn->outputWeights == NULL) {
+        DEBUG_PRINT("Failed to allocate memory for output weights");
+        for (int i = 0; i < inputSize; i++) free(nn->hiddenWeights[i]);
+        free(nn->hiddenWeights);
+        free(nn);
+        return NULL;
+    }
+
+    for(int i = 0; i < hiddenSize; i++)
     {
         nn->outputWeights[i] = (double *)malloc(outputSize * sizeof(double));
-        for (int j = 0; j < outputSize; j++)
+        if (nn->outputWeights[i] == NULL) {
+            DEBUG_PRINT("Failed to allocate memory for output weights row %d", i);
+            for (int j = 0; j < i; j++) free(nn->outputWeights[j]);
+            for (int j = 0; j < inputSize; j++) free(nn->hiddenWeights[j]);
+            free(nn->outputWeights);
+            free(nn->hiddenWeights);
+            free(nn);
+            return NULL;
+        }
+        for(int j = 0; j < outputSize; j++)
         {
-            nn->outputWeights[i][j] = ((double)rand() / RAND_MAX) * 2 - 1; // Initialize weights randomly between -1 and 1
+            nn->outputWeights[i][j] = ((double)rand() / RAND_MAX) * 2 - 1;
         }
     }
 
-    // Allocate memory for hidden and output biases
     nn->hiddenBias = (double *)malloc(hiddenSize * sizeof(double));
     nn->outputBias = (double *)malloc(outputSize * sizeof(double));
 
-    for (int i = 0; i < hiddenSize; i++)
-    {
-        nn->hiddenBias[i] = ((double)rand() / RAND_MAX) * 2 - 1; // Initialize biases randomly between -1 and 1
-    }
-    for (int i = 0; i < outputSize; i++)
-    {
-        nn->outputBias[i] = ((double)rand() / RAND_MAX) * 2 - 1; // Initialize biases randomly between -1 and 1
+    if (nn->hiddenBias == NULL || nn->outputBias == NULL) {
+        DEBUG_PRINT("Failed to allocate memory for biases");
+        for (int i = 0; i < hiddenSize; i++) free(nn->outputWeights[i]);
+        for (int i = 0; i < inputSize; i++) free(nn->hiddenWeights[i]);
+        free(nn->outputWeights);
+        free(nn->hiddenWeights);
+        free(nn->hiddenBias);
+        free(nn->outputBias);
+        free(nn);
+        return NULL;
     }
 
-    return nn; // Return the created neural network
+    for(int i = 0; i < hiddenSize; i++)
+    {
+        nn->hiddenBias[i] = ((double)rand() / RAND_MAX) * 2 - 1;
+    }
+    for(int i = 0; i < outputSize; i++)
+    {
+        nn->outputBias[i] = ((double)rand() / RAND_MAX) * 2 - 1;
+    }
+
+    DEBUG_PRINT("Neural network created successfully");
+    return nn;
 }
 
-// Function for forward propagation
 void forwardPropagation(NeuralNetwork *nn, double *input, double *hiddenLayer, double *outputLayer)
 {
-    // Calculate activations for the hidden layer
-    for (int i = 0; i < nn->hiddenSize; i++)
+    DEBUG_PRINT("Entering forwardPropagation");
+
+    for(int i = 0; i < nn->hiddenSize; i++)
     {
         hiddenLayer[i] = 0;
-        for (int j = 0; j < nn->inputSize; j++) // Fixed loop limit from 'i' to 'j'
+        for(int j = 0; j < nn->inputSize; j++)
         {
-            hiddenLayer[i] += input[j] * nn->hiddenWeights[j][i]; // Compute weighted sum for hidden layer
+            hiddenLayer[i] += input[j] * nn->hiddenWeights[j][i];
         }
-        hiddenLayer[i] = relu(hiddenLayer[i] + nn->hiddenBias[i]); // Apply ReLU activation function and add bias
+        hiddenLayer[i] = relu(hiddenLayer[i] + nn->hiddenBias[i]);
     }
+    DEBUG_PRINT("Hidden layer computed");
 
-    // Calculate activations for the output layer
-    for (int i = 0; i < nn->outputSize; i++)
+    for(int i = 0; i < nn->outputSize; i++)
     {
         outputLayer[i] = 0;
-        for (int j = 0; j < nn->hiddenSize; j++)
+        for(int j = 0; j < nn->hiddenSize; j++)
         {
-            outputLayer[i] += hiddenLayer[j] * nn->outputWeights[j][i]; // Compute weighted sum for output layer
+            outputLayer[i] += hiddenLayer[j] * nn->outputWeights[j][i];
         }
-        outputLayer[i] += nn->outputBias[i]; // Add bias to the output layer
+        outputLayer[i] += nn->outputBias[i];
     }
+    DEBUG_PRINT("Output layer computed");
 
-    // Apply softmax function to output layer
     softmax(outputLayer, nn->outputSize);
+    DEBUG_PRINT("Softmax applied");
 }
-
 
 void backwardPropagation(NeuralNetwork *nn, double *input, double *hiddenLayer, double *outputLayer, int label, double learningRate)
 {
-    // Initialize output error array
+    DEBUG_PRINT("Entering backwardPropagation");
+
     double outputError[10] = {0};
     for(int i = 0; i < nn->outputSize; i++)
     {
-        // Calculate the error for the output layer
-        outputError[i] = outputLayer[i] - (i == label ? 1 : 0);
+        outputError[i] = (i == label) ? outputLayer[i] - 1 : outputLayer[i];
     }
 
-    // Initialize hidden error array
-    double hiddenError[128] = {0}; // Ensure it matches the size of your hidden layer
+    double hiddenError[128];
     for(int i = 0; i < nn->hiddenSize; i++)
     {
         hiddenError[i] = 0;
         for(int j = 0; j < nn->outputSize; j++)
         {
-            // Accumulate the weighted output errors
             hiddenError[i] += outputError[j] * nn->outputWeights[i][j];
         }
-        // Apply the derivative of the activation function
         hiddenError[i] *= reluDerivative(hiddenLayer[i]);
     }
 
-    // Update output weights
     for(int i = 0; i < nn->hiddenSize; i++)
     {
         for(int j = 0; j < nn->outputSize; j++)
         {
-            // Adjust output weights
             nn->outputWeights[i][j] -= learningRate * outputError[j] * hiddenLayer[i];
         }
     }
 
-    // Update hidden weights
-    for (int i = 0; i < nn->inputSize; i++)
+    for(int i = 0; i < nn->inputSize; i++)
     {
         for(int j = 0; j < nn->hiddenSize; j++)
         {
-            // Adjust hidden weights
             nn->hiddenWeights[i][j] -= learningRate * hiddenError[j] * input[i];
         }
     }
 
-    // Update output biases
-    for (int i = 0; i < nn->outputSize; i++)
+    for(int i = 0; i < nn->outputSize; i++)
     {
         nn->outputBias[i] -= learningRate * outputError[i];
     }
-
-    // Update hidden biases
-    for (int i = 0; i < nn->hiddenSize; i++)
+    for(int i = 0; i < nn->hiddenSize; i++)
     {
         nn->hiddenBias[i] -= learningRate * hiddenError[i];
     }
+
+    DEBUG_PRINT("Backward propagation completed");
 }
 
-void trainNetwork(NeuralNetwork *nn, double **trainingData, int *labels, int *numSamples, int *epochs, double learningRate)
-{
+void trainNetwork(NeuralNetwork *nn, double **trainingData, int *labels, int numSamples, int epochs, double learningRate) {
+    DEBUG_PRINT("Entering trainNetwork function");
     double hiddenLayer[128];
     double outputLayer[10];
 
-    for(int epoch = 0; epoch < epochs; epoch++)
-        {
-            for(int i = 0; i < numSamples; i++)
-                {
-                    forwardPropogation(nn, trainingData[i], hiddenLayer, outputLayer);
-                    backwardPropogation(nn, trainingData[i], hiddenLayer, outputLayer, labels[i], learningRate);
-                }
-            printf("Epoch %d Completed\n", epoch + 1);
-        }
-}
+    for (int epoch = 0; epoch < epochs; epoch++) {
+        DEBUG_PRINT("Starting epoch %d of %d", epoch + 1, epochs);
+        double totalLoss = 0.0;
+        for (int i = 0; i < numSamples; i++) {
+            DEBUG_PRINT("Processing sample %d of %d in epoch %d", i + 1, numSamples, epoch + 1);
+            if (trainingData[i] == NULL) {
+                DEBUG_PRINT("Error: NULL input data at sample %d", i);
+                return;
+            }
+            forwardPropagation(nn, trainingData[i], hiddenLayer, outputLayer);
 
-double testNetwork(NeuralNetwork *nn, double **testingData, int *labels, int numSamples)
-{
-    int correctPredictions = 0;
-    double hiddenLayer[128];  // Assuming hidden layer size is 128
-    double outputLayer[10];   // Assuming output layer size is 10 (for digits 0-9)
+            if (labels[i] < 0 || labels[i] >= nn->outputSize) {
+                DEBUG_PRINT("Error: Invalid label %d at sample %d", labels[i], i);
+                return;
+            }
 
-    for (int i = 0; i < numSamples; i++)
-    {
-        forwardPropagation(nn, testingData[i], hiddenLayer, outputLayer);
+            totalLoss -= log(outputLayer[labels[i]]);
 
-        // Find the index of the highest output, which is our predicted digit
-        int predictedLabel = 0;
-        double maxOutput = outputLayer[0];
-        for (int j = 1; j < nn->outputSize; j++)
-        {
-            if (outputLayer[j] > maxOutput)
-            {
-                maxOutput = outputLayer[j];
-                predictedLabel = j;
+            backwardPropagation(nn, trainingData[i], hiddenLayer, outputLayer, labels[i], learningRate);
+
+            if (i % 1000 == 0) {
+                DEBUG_PRINT("Completed %d samples in epoch %d", i + 1, epoch + 1);
             }
         }
-
-        // Check if the prediction is correct
-        if (predictedLabel == labels[i])
-        {
-            correctPredictions++;
-        }
+        DEBUG_PRINT("Epoch %d completed, Average Loss: %f", epoch + 1, totalLoss / numSamples);
     }
-
-    // Calculate and return the accuracy
-    return (double)correctPredictions / numSamples;
+    DEBUG_PRINT("Training completed");
 }
 
-void freeNeuralNetwork(NeuralNetwork *nn)
-{
-    for(int i = 0; i < nn->inputSize; i++ )
-        {
-            free(nn->hiddenWeights[i]);
-        }
+void freeNeuralNetwork(NeuralNetwork *nn) {
+    if (nn == NULL) return;
+
+    for (int i = 0; i < nn->inputSize; i++) {
+        free(nn->hiddenWeights[i]);
+    }
     free(nn->hiddenWeights);
 
-    for(int i = 0; i < nn->hiddenSize; i++)
-        {
-            free(nn->outputWeights[i]);
-        }
+    for (int i = 0; i < nn->hiddenSize; i++) {
+        free(nn->outputWeights[i]);
+    }
     free(nn->outputWeights);
 
     free(nn->hiddenBias);
     free(nn->outputBias);
     free(nn);
+
+    DEBUG_PRINT("Neural network freed");
 }
