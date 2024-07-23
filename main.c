@@ -35,6 +35,35 @@ double calculateAccuracy(NeuralNetwork *nn, double **images, int *labels, int nu
     return (double)correct / numSamples;
 }
 
+void generateSubmission(NeuralNetwork *nn, double **testImages, int numSamples, const char *filename) {
+    FILE *file = fopen(filename, "w");
+    if (file == NULL) {
+        printf("Error opening file for submission.\n");
+        return;
+    }
+
+    fprintf(file, "ImageId,Label\n");
+
+    double hiddenLayer[HIDDEN_SIZE];
+    double outputLayer[OUTPUT_SIZE];
+
+    for (int i = 0; i < numSamples; i++) {
+        forwardPropagation(nn, testImages[i], hiddenLayer, outputLayer);
+        int predictedLabel = 0;
+        double maxOutput = outputLayer[0];
+        for (int j = 1; j < OUTPUT_SIZE; j++) {
+            if (outputLayer[j] > maxOutput) {
+                maxOutput = outputLayer[j];
+                predictedLabel = j;
+            }
+        }
+        fprintf(file, "%d,%d\n", i + 1, predictedLabel);
+    }
+
+    fclose(file);
+    printf("Submission file generated: %s\n", filename);
+}
+
 int main() {
     srand(time(NULL));
 
@@ -69,6 +98,9 @@ int main() {
 
     double testAccuracy = calculateAccuracy(nn, testImages, testLabels, TEST_SAMPLES);
     printf("Test accuracy: %.2f%%\n", testAccuracy * 100);
+
+    // Generate submission file
+    generateSubmission(nn, testImages, TEST_SAMPLES, "sample_submission.csv");
 
     // Free memory
     freeNeuralNetwork(nn);
