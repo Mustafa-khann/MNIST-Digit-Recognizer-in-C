@@ -10,7 +10,7 @@
 #define HIDDEN_SIZE 128
 #define OUTPUT_SIZE 10
 #define EPOCHS 50
-#define LEARNING_RATE 0.1
+#define LEARNING_RATE 0.05
 
 double calculateAccuracy(NeuralNetwork *nn, double **images, int *labels, int numSamples) {
     int correct = 0;
@@ -85,6 +85,18 @@ int main() {
     // Load data
     loadMNISTData("dataset/train.csv", "dataset/test.csv", trainingImages, trainingLabels, testImages, testLabels, TRAINING_SAMPLES, TEST_SAMPLES);
     printf("Data loaded, creating neural network...\n");
+
+    // Normalize data
+    for (int i = 0; i < TRAINING_SAMPLES; i++) {
+        for (int j = 0; j < INPUT_SIZE; j++) {
+            trainingImages[i][j] /= 255.0;
+        }
+    }
+    for (int i = 0; i < TEST_SAMPLES; i++) {
+        for (int j = 0; j < INPUT_SIZE; j++) {
+            testImages[i][j] /= 255.0;
+        }
+    }
 
     // Create and train neural network
     NeuralNetwork *nn = createNeuralNetwork(INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE);
