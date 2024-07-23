@@ -7,7 +7,6 @@ This project implements a simple neural network to recognize handwritten digits 
 - Single hidden layer neural network
 - ReLU activation function in the hidden layer
 - Softmax activation function in the output layer
-- Stochastic Gradient Descent (SGD) for training
 
 ## Dataset
 
