@@ -201,7 +201,7 @@ void trainNetwork(NeuralNetwork *nn, double **trainingData, int *labels, int num
     }
 }
 
-// Free memory allocated for the neural network
+// Freeing memory allocated for the neural network
 void freeNeuralNetwork(NeuralNetwork *nn) {
     if (nn == NULL) return;
 
