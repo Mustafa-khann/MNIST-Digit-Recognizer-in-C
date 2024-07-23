@@ -3,8 +3,6 @@
 #include <math.h>
 #include "neuralNetwork.h"
 
-#define DEBUG_PRINT(fmt, ...) printf("%s:%d: " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
-
 double relu(double x)
 {
     return x > 0 ? x : 0;
@@ -40,11 +38,8 @@ void softmax(double* input, int size)
 
 NeuralNetwork* createNeuralNetwork(int inputSize, int hiddenSize, int outputSize)
 {
-    DEBUG_PRINT("Creating neural network with input: %d, hidden: %d, output: %d", inputSize, hiddenSize, outputSize);
-
     NeuralNetwork *nn = (NeuralNetwork *)malloc(sizeof(NeuralNetwork));
     if (nn == NULL) {
-        DEBUG_PRINT("Failed to allocate memory for neural network");
         return NULL;
     }
 
@@ -54,7 +49,6 @@ NeuralNetwork* createNeuralNetwork(int inputSize, int hiddenSize, int outputSize
 
     nn->hiddenWeights = (double **)malloc(inputSize * sizeof(double *));
     if (nn->hiddenWeights == NULL) {
-        DEBUG_PRINT("Failed to allocate memory for hidden weights");
         free(nn);
         return NULL;
     }
@@ -63,7 +57,6 @@ NeuralNetwork* createNeuralNetwork(int inputSize, int hiddenSize, int outputSize
     {
         nn->hiddenWeights[i] = (double *)malloc(hiddenSize * sizeof(double));
         if (nn->hiddenWeights[i] == NULL) {
-            DEBUG_PRINT("Failed to allocate memory for hidden weights row %d", i);
             for (int j = 0; j < i; j++) free(nn->hiddenWeights[j]);
             free(nn->hiddenWeights);
             free(nn);
@@ -77,7 +70,6 @@ NeuralNetwork* createNeuralNetwork(int inputSize, int hiddenSize, int outputSize
 
     nn->outputWeights = (double **)malloc(hiddenSize * sizeof(double *));
     if (nn->outputWeights == NULL) {
-        DEBUG_PRINT("Failed to allocate memory for output weights");
         for (int i = 0; i < inputSize; i++) free(nn->hiddenWeights[i]);
         free(nn->hiddenWeights);
         free(nn);
@@ -88,7 +80,6 @@ NeuralNetwork* createNeuralNetwork(int inputSize, int hiddenSize, int outputSize
     {
         nn->outputWeights[i] = (double *)malloc(outputSize * sizeof(double));
         if (nn->outputWeights[i] == NULL) {
-            DEBUG_PRINT("Failed to allocate memory for output weights row %d", i);
             for (int j = 0; j < i; j++) free(nn->outputWeights[j]);
             for (int j = 0; j < inputSize; j++) free(nn->hiddenWeights[j]);
             free(nn->outputWeights);
@@ -106,7 +97,6 @@ NeuralNetwork* createNeuralNetwork(int inputSize, int hiddenSize, int outputSize
     nn->outputBias = (double *)malloc(outputSize * sizeof(double));
 
     if (nn->hiddenBias == NULL || nn->outputBias == NULL) {
-        DEBUG_PRINT("Failed to allocate memory for biases");
         for (int i = 0; i < hiddenSize; i++) free(nn->outputWeights[i]);
         for (int i = 0; i < inputSize; i++) free(nn->hiddenWeights[i]);
         free(nn->outputWeights);
@@ -126,14 +116,11 @@ NeuralNetwork* createNeuralNetwork(int inputSize, int hiddenSize, int outputSize
         nn->outputBias[i] = ((double)rand() / RAND_MAX) * 2 - 1;
     }
 
-    DEBUG_PRINT("Neural network created successfully");
     return nn;
 }
 
 void forwardPropagation(NeuralNetwork *nn, double *input, double *hiddenLayer, double *outputLayer)
 {
-    DEBUG_PRINT("Entering forwardPropagation");
-
     for(int i = 0; i < nn->hiddenSize; i++)
     {
         hiddenLayer[i] = 0;
@@ -143,7 +130,6 @@ void forwardPropagation(NeuralNetwork *nn, double *input, double *hiddenLayer, d
         }
         hiddenLayer[i] = relu(hiddenLayer[i] + nn->hiddenBias[i]);
     }
-    DEBUG_PRINT("Hidden layer computed");
 
     for(int i = 0; i < nn->outputSize; i++)
     {
@@ -154,16 +140,12 @@ void forwardPropagation(NeuralNetwork *nn, double *input, double *hiddenLayer, d
         }
         outputLayer[i] += nn->outputBias[i];
     }
-    DEBUG_PRINT("Output layer computed");
 
     softmax(outputLayer, nn->outputSize);
-    DEBUG_PRINT("Softmax applied");
 }
 
 void backwardPropagation(NeuralNetwork *nn, double *input, double *hiddenLayer, double *outputLayer, int label, double learningRate)
 {
-    DEBUG_PRINT("Entering backwardPropagation");
-
     double outputError[10] = {0};
     for(int i = 0; i < nn->outputSize; i++)
     {
@@ -205,42 +187,30 @@ void backwardPropagation(NeuralNetwork *nn, double *input, double *hiddenLayer, 
     {
         nn->hiddenBias[i] -= learningRate * hiddenError[i];
     }
-
-    DEBUG_PRINT("Backward propagation completed");
 }
 
 void trainNetwork(NeuralNetwork *nn, double **trainingData, int *labels, int numSamples, int epochs, double learningRate) {
-    DEBUG_PRINT("Entering trainNetwork function");
     double hiddenLayer[128];
     double outputLayer[10];
 
     for (int epoch = 0; epoch < epochs; epoch++) {
-        DEBUG_PRINT("Starting epoch %d of %d", epoch + 1, epochs);
         double totalLoss = 0.0;
         for (int i = 0; i < numSamples; i++) {
-            DEBUG_PRINT("Processing sample %d of %d in epoch %d", i + 1, numSamples, epoch + 1);
             if (trainingData[i] == NULL) {
-                DEBUG_PRINT("Error: NULL input data at sample %d", i);
                 return;
             }
             forwardPropagation(nn, trainingData[i], hiddenLayer, outputLayer);
 
             if (labels[i] < 0 || labels[i] >= nn->outputSize) {
-                DEBUG_PRINT("Error: Invalid label %d at sample %d", labels[i], i);
                 return;
             }
 
             totalLoss -= log(outputLayer[labels[i]]);
 
             backwardPropagation(nn, trainingData[i], hiddenLayer, outputLayer, labels[i], learningRate);
-
-            if (i % 1000 == 0) {
-                DEBUG_PRINT("Completed %d samples in epoch %d", i + 1, epoch + 1);
-            }
         }
-        DEBUG_PRINT("Epoch %d completed, Average Loss: %f", epoch + 1, totalLoss / numSamples);
+        printf("Epoch %d/%d completed, Average Loss: %f\n", epoch + 1, epochs, totalLoss / numSamples);
     }
-    DEBUG_PRINT("Training completed");
 }
 
 void freeNeuralNetwork(NeuralNetwork *nn) {
@@ -259,6 +229,4 @@ void freeNeuralNetwork(NeuralNetwork *nn) {
     free(nn->hiddenBias);
     free(nn->outputBias);
     free(nn);
-
-    DEBUG_PRINT("Neural network freed");
 }
