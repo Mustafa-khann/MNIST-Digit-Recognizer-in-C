@@ -27,4 +27,4 @@ The program will train on the training data and then generate a `sample_submissi
 
 ## Note
 
-This is a basic implementation and may take a while to run on the full dataset. For better performance, consider techniques like mini-batch training or using a more optimized linear algebra library.
+This is a basic implementation and may take a while to run on the full dataset. This can be improved in a thousand ways! Hesitate not to contribute.
