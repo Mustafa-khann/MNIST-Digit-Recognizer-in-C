@@ -1,17 +1,28 @@
-#include <csignal>
 #include <stdlib.h>
+#include <omp.h>
 #include <stdio.h>
 #include <math.h>
 #include "neuralNetwork.h"
 
+// Xavier/Glorot initialization
+double xavier_init(int inputs, int outputs) {
+    double limit = sqrt(6.0 / (inputs + outputs));
+    return ((double)rand() / RAND_MAX) * 2 * limit - limit;
+}
+
 // Activation function: ReLU (Rectified Linear Unit)
 double relu(double x) {
-    return (x > 0) ? x : 0;
+    return fmax(0, x);
 }
 
 // Derivative of ReLU function
 double reluDerivative(double x) {
-    return (x > 0) ? 1 : 0;
+    return x > 0 ? 1 : 0;
+}
+
+// Clip gradients
+double clip_gradient(double grad, double threshold) {
+    return fmax(fmin(grad, threshold), -threshold);
 }
 
 // Softmax activation function for output layer
@@ -58,7 +69,7 @@ NeuralNetwork* createNeuralNetwork(int inputSize, int hiddenSize, int outputSize
             return NULL;
         }
         for (int j = 0; j < hiddenSize; j++) {
-            nn->hiddenWeights[i][j] = ((double)rand() / RAND_MAX) * 2 - 1;  // Random initialization between -1 and 1
+            nn->hiddenWeights[i][j] = xavier_init(inputSize, hiddenSize);
         }
     }
 
@@ -82,7 +93,7 @@ NeuralNetwork* createNeuralNetwork(int inputSize, int hiddenSize, int outputSize
             return NULL;
         }
         for (int j = 0; j < outputSize; j++) {
-            nn->outputWeights[i][j] = ((double)rand() / RAND_MAX) * 2 - 1;  // Random initialization between -1 and 1
+            nn->outputWeights[i][j] = xavier_init(hiddenSize, outputSize);
         }
     }
 
@@ -102,27 +113,37 @@ NeuralNetwork* createNeuralNetwork(int inputSize, int hiddenSize, int outputSize
     }
 
     for (int i = 0; i < hiddenSize; i++) {
-        nn->hiddenBias[i] = ((double)rand() / RAND_MAX) * 2 - 1;  // Random initialization between -1 and 1
+        nn->hiddenBias[i] = 0;  // Initialize biases to zero
     }
     for (int i = 0; i < outputSize; i++) {
-        nn->outputBias[i] = ((double)rand() / RAND_MAX) * 2 - 1;  // Random initialization between -1 and 1
+        nn->outputBias[i] = 0;  // Initialize biases to zero
     }
 
     return nn;
 }
 
-// Perform forward propagation through the network
+// Perform forward propagation through the network with batch normalization
 void forwardPropagation(NeuralNetwork *nn, double *input, double *hiddenLayer, double *outputLayer) {
-    // Calculate hidden layer activations
+    // Hidden layer with batch normalization
+    double hiddenSum[128] = {0};
+    double hiddenMean = 0, hiddenVar = 0;
     for (int i = 0; i < nn->hiddenSize; i++) {
-        hiddenLayer[i] = 0;
         for (int j = 0; j < nn->inputSize; j++) {
-            hiddenLayer[i] += input[j] * nn->hiddenWeights[j][i];
+            hiddenSum[i] += input[j] * nn->hiddenWeights[j][i];
         }
-        hiddenLayer[i] = relu(hiddenLayer[i] + nn->hiddenBias[i]);
+        hiddenSum[i] += nn->hiddenBias[i];
+        hiddenMean += hiddenSum[i];
+    }
+    hiddenMean /= nn->hiddenSize;
+    for (int i = 0; i < nn->hiddenSize; i++) {
+        hiddenVar += (hiddenSum[i] - hiddenMean) * (hiddenSum[i] - hiddenMean);
+    }
+    hiddenVar = sqrt(hiddenVar / nn->hiddenSize + 1e-8);
+    for (int i = 0; i < nn->hiddenSize; i++) {
+        hiddenLayer[i] = relu((hiddenSum[i] - hiddenMean) / hiddenVar);
     }
 
-    // Calculate output layer activations
+    // Output layer
     for (int i = 0; i < nn->outputSize; i++) {
         outputLayer[i] = 0;
         for (int j = 0; j < nn->hiddenSize; j++) {
@@ -130,12 +151,10 @@ void forwardPropagation(NeuralNetwork *nn, double *input, double *hiddenLayer, d
         }
         outputLayer[i] += nn->outputBias[i];
     }
-
-    // Apply softmax to output layer
     softmax(outputLayer, nn->outputSize);
 }
 
-// Perform backward propagation to update weights and biases
+// Perform backward propagation to update weights and biases with gradient clipping
 void backwardPropagation(NeuralNetwork *nn, double *input, double *hiddenLayer, double *outputLayer, int label, double learningRate) {
     // Calculate output layer error
     double outputError[10] = {0};
@@ -153,17 +172,20 @@ void backwardPropagation(NeuralNetwork *nn, double *input, double *hiddenLayer, 
         hiddenError[i] *= reluDerivative(hiddenLayer[i]);
     }
 
-    // Update output weights
+    // Update output weights with gradient clipping
+    double clipThreshold = 1.0;
     for (int i = 0; i < nn->hiddenSize; i++) {
         for (int j = 0; j < nn->outputSize; j++) {
-            nn->outputWeights[i][j] -= learningRate * outputError[j] * hiddenLayer[i];
+            double grad = clip_gradient(outputError[j] * hiddenLayer[i], clipThreshold);
+            nn->outputWeights[i][j] -= learningRate * grad;
         }
     }
 
-    // Update hidden weights
+    // Update hidden weights with gradient clipping
     for (int i = 0; i < nn->inputSize; i++) {
         for (int j = 0; j < nn->hiddenSize; j++) {
-            nn->hiddenWeights[i][j] -= learningRate * hiddenError[j] * input[i];
+            double grad = clip_gradient(hiddenError[j] * input[i], clipThreshold);
+            nn->hiddenWeights[i][j] -= learningRate * grad;
         }
     }
 
@@ -176,49 +198,54 @@ void backwardPropagation(NeuralNetwork *nn, double *input, double *hiddenLayer, 
     }
 }
 
-// Train the neural network
-void trainNetwork(NeuralNetwork *nn, double **trainingData, int *labels, int numSamples, int epochs, double learningRate) {
-    double hiddenLayer[128];
-    double outputLayer[10];
-
-    int chunkSize = numSamples / 8;
+// Train the neural network with learning rate decay
+void trainNetwork(NeuralNetwork *nn, double **trainingData, int *labels, int numSamples, int epochs, double initialLearningRate) {
+    int num_threads = omp_get_max_threads();
+    double *thread_losses = (double *)calloc(num_threads, sizeof(double));
+    double learningRate = initialLearningRate;
 
     for (int epoch = 0; epoch < epochs; epoch++) {
         double totalLoss = 0.0;
 
-        // Each sample
-        for(int chunk = 0; chunk<chunkSize; chunk++)
-            {
-                int start = chunk * chunkSize;
-                int end = (chunk + 1) * chunkSize;
+        #pragma omp parallel
+        {
+            int thread_id = omp_get_thread_num();
+            double hiddenLayer[128];
+            double outputLayer[10];
+            double localLoss = 0.0;
 
-                #pragma omp parallel for
-                for(int i = start; i<end; i++)
-                    {
-                        if(trainingData[i] == NULL)
-                            {
-                                return;
-                            }
-                        forwardPropagation(nn, trainingData, hiddenLayer, outputLayer);
+            #pragma omp for
+            for (int i = 0; i < numSamples; i++) {
+                if (trainingData[i] == NULL || labels[i] < 0 || labels[i] >= nn->outputSize) {
+                    continue;
+                }
 
-                        if(labels[i] < 0 || labels[i] >= nn->outputSize)
-                            {
-                                return;
-                            }
+                forwardPropagation(nn, trainingData[i], hiddenLayer, outputLayer);
 
-                        // Calculate Cross-entropy
-                        double loss = -log(outputLayer[labels[i]]);
+                localLoss -= log(fmax(outputLayer[labels[i]], 1e-10));
 
-                        // Update totalLoss
-                        #pragma omp atomic
-                        totalLoss += loss;
-
-                        backwardPropagation(nn, trainingData, hiddenLayer, outputLayer, labels[i], learningRate);
-                    }
+                #pragma omp critical
+                {
+                    backwardPropagation(nn, trainingData[i], hiddenLayer, outputLayer, labels[i], learningRate);
+                }
             }
-        // print average loss
-        printf("Epoch %d/%d completed, Average Loss: %f\n", epoch + 1, epochs, totalLoss / numSamples);
+
+            thread_losses[thread_id] = localLoss;
+        }
+
+        for (int i = 0; i < num_threads; i++) {
+            totalLoss += thread_losses[i];
+            thread_losses[i] = 0.0;
+        }
+
+        printf("Epoch %d/%d completed, Average Loss: %f, Learning Rate: %f\n",
+               epoch + 1, epochs, totalLoss / numSamples, learningRate);
+
+        // Learning rate decay
+        learningRate *= 0.99;
     }
+
+    free(thread_losses);
 }
 
 // Freeing memory allocated for the neural network
