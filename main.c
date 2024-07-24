@@ -1,3 +1,4 @@
+#include <asm-generic/errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -65,6 +66,10 @@ void generateSubmission(NeuralNetwork *nn, double **testImages, int numSamples, 
 }
 
 int main() {
+    // for checking the time it the program takes
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
     srand(time(NULL));
 
     // Allocate memory
@@ -126,6 +131,18 @@ int main() {
     free(trainingLabels);
     free(testImages);
     free(testLabels);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
+    // Calculate the elapsed time in seconds
+    double elapsed_time = (end.tv_sec - start.tv_sec) +
+    (end.tv_nsec - start.tv_nsec) / 1E9;
+
+    // Convert the elapsed time to minutes
+    double time_in_minutes = elapsed_time / 60;
+
+    // Print the elapsed time in seconds and minutes
+    printf("Elapsed time in minutes: %f\n", time_in_minutes);
 
     return 0;
 }
