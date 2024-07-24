@@ -1,3 +1,4 @@
+#include <csignal>
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -180,23 +181,42 @@ void trainNetwork(NeuralNetwork *nn, double **trainingData, int *labels, int num
     double hiddenLayer[128];
     double outputLayer[10];
 
+    int chunkSize = numSamples / 8;
+
     for (int epoch = 0; epoch < epochs; epoch++) {
         double totalLoss = 0.0;
-        for (int i = 0; i < numSamples; i++) {
-            if (trainingData[i] == NULL) {
-                return;
+
+        // Each sample
+        for(int chunk = 0; chunk<chunkSize; chunk++)
+            {
+                int start = chunk * chunkSize;
+                int end = (chunk + 1) * chunkSize;
+
+                #pragma omp parallel for
+                for(int i = start; i<end; i++)
+                    {
+                        if(trainingData[i] == NULL)
+                            {
+                                return;
+                            }
+                        forwardPropagation(nn, trainingData, hiddenLayer, outputLayer);
+
+                        if(labels[i] < 0 || labels[i] >= nn->outputSize)
+                            {
+                                return;
+                            }
+
+                        // Calculate Cross-entropy
+                        double loss = -log(outputLayer[labels[i]]);
+
+                        // Update totalLoss
+                        #pragma omp atomic
+                        totalLoss += loss;
+
+                        backwardPropagation(nn, trainingData, hiddenLayer, outputLayer, labels[i], learningRate);
+                    }
             }
-            forwardPropagation(nn, trainingData[i], hiddenLayer, outputLayer);
-
-            if (labels[i] < 0 || labels[i] >= nn->outputSize) {
-                return;
-            }
-
-            // Calculate cross-entropy loss
-            totalLoss -= log(outputLayer[labels[i]]);
-
-            backwardPropagation(nn, trainingData[i], hiddenLayer, outputLayer, labels[i], learningRate);
-        }
+        // print average loss
         printf("Epoch %d/%d completed, Average Loss: %f\n", epoch + 1, epochs, totalLoss / numSamples);
     }
 }
