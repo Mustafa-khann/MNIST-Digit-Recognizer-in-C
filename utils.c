@@ -55,39 +55,38 @@ void loadMNISTData(const char *trainFile, const char *testFile, double **trainin
     fclose(file);
 
     file = fopen(testFile, "r");
-    if(file == NULL)
-    {
-        fprintf(stderr, "Error opening test file\n");
-        exit(1);
-    }
+        if(file == NULL)
+        {
+            fprintf(stderr, "Error opening test file\n");
+            exit(1);
+        }
 
-    if (fgets(line, MAX_LINE_LENGTH, file) == NULL) {
-        fprintf(stderr, "Error reading header from test file\n");
-        fclose(file);
-        exit(1);
-    }
-
-    for(int i = 0; i < testSize; i++)
-    {
         if (fgets(line, MAX_LINE_LENGTH, file) == NULL) {
-            fprintf(stderr, "Error reading line %d from test file\n", i+1);
+            fprintf(stderr, "Error reading header from test file\n");
             fclose(file);
             exit(1);
         }
 
-        for(int j = 0; j < 784; j++)
+        for(int i = 0; i < testSize; i++)
         {
-            token = strtok(j == 0 ? line : NULL, ",");
-            if (token == NULL) {
-                fprintf(stderr, "Error parsing pixel %d in line %d of test file\n", j+1, i+1);
+            if (fgets(line, MAX_LINE_LENGTH, file) == NULL) {
+                fprintf(stderr, "Error reading line %d from test file\n", i+1);
                 fclose(file);
                 exit(1);
             }
-            testImages[i][j] = atof(token) / 255.0;
-        }
-        testLabels[i] = -1;
-    }
-    fclose(file);
 
-    printf("MNIST data loaded from CSV files\n");
+            for(int j = 0; j < 784; j++)
+            {
+                token = strtok(j == 0 ? line : NULL, ",");
+                if (token == NULL) {
+                    fprintf(stderr, "Error parsing pixel %d in line %d of test file\n", j+1, i+1);
+                    fclose(file);
+                    exit(1);
+                }
+                testImages[i][j] = atof(token) / 255.0;
+            }
+        }
+        fclose(file);
+
+        printf("MNIST data loaded from CSV files\n");
 }
