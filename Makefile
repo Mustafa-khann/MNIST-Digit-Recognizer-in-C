@@ -12,11 +12,8 @@ all: $(TARGET)
 $(TARGET): $(SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-buildd:
-	gcc main.c neuralNetwork.c utils.c -o mnist_recognizer -fopenmp -O3 -march=native -lm
-
 build:
-	gcc main.c neuralNetwork.c utils.c -o mnist_recognizer -lm
+	gcc main.c neuralNetwork.c utils.c -o mnist_recognizer -fopenmp -O3 -march=native -lm
 
 clean:
 	rm -f $(TARGET) sample_submission.csv
