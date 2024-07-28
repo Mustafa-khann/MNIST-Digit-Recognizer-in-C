@@ -12,7 +12,7 @@ all: $(TARGET)
 $(TARGET): $(SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-build-openmp:
+buildd:
 	gcc main.c neuralNetwork.c utils.c -o mnist_recognizer -fopenmp -O3 -march=native -lm
 
 build:

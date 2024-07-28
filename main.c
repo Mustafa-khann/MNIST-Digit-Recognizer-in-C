@@ -4,6 +4,7 @@
 #include <time.h>
 #include "neuralNetwork.h"
 #include "utils.h"
+#include <omp.h>
 
 #define TRAINING_SAMPLES 42000
 #define TEST_SAMPLES 28000
@@ -11,7 +12,7 @@
 #define HIDDEN_SIZE 128
 #define OUTPUT_SIZE 10
 #define EPOCHS 50
-#define LEARNING_RATE 0.05
+#define LEARNING_RATE 0.005
 
 double calculateAccuracy(NeuralNetwork *nn, double **images, int *labels, int numSamples) {
     int correct = 0;
@@ -112,9 +113,6 @@ int main() {
     // Calculate and print accuracies
     double trainingAccuracy = calculateAccuracy(nn, trainingImages, trainingLabels, TRAINING_SAMPLES);
     printf("Training accuracy: %.2f%%\n", trainingAccuracy * 100);
-
-    double testAccuracy = calculateAccuracy(nn, testImages, testLabels, TEST_SAMPLES);
-    printf("Test accuracy: %.2f%%\n", testAccuracy * 100);
 
     // Generate submission file
     generateSubmission(nn, testImages, TEST_SAMPLES, "sample_submission.csv");
