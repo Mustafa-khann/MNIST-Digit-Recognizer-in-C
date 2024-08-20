@@ -196,17 +196,10 @@ void trainNetwork(NeuralNetwork *nn, double **trainingData, int *labels, int num
 
             #pragma omp for
             for (int i = 0; i < numSamples; i++) {
-                if (trainingData[i] == NULL) {
-                    continue;
-                }
+                if (!trainingData[i] || labels[i] < 0 || labels[i] >= nn->outputSize) continue;
+
                 forwardPropagation(nn, trainingData[i], hiddenLayer, outputLayer);
-
-                if (labels[i] < 0 || labels[i] >= nn->outputSize) {
-                    continue;
-                }
-
                 totalLoss -= log(outputLayer[labels[i]]);
-
                 backwardPropagation(nn, trainingData[i], hiddenLayer, outputLayer, labels[i], learningRate);
             }
         }
@@ -214,6 +207,7 @@ void trainNetwork(NeuralNetwork *nn, double **trainingData, int *labels, int num
         printf("Epoch %d/%d completed, Average Loss: %f\n", epoch + 1, epochs, totalLoss / numSamples);
     }
 }
+
 
 // Freeing memory allocated for the neural network
 void freeNeuralNetwork(NeuralNetwork *nn) {
