@@ -217,18 +217,13 @@ void trainNetwork(NeuralNetwork *nn, double **trainingData, int *labels, int num
 
 // Freeing memory allocated for the neural network
 void freeNeuralNetwork(NeuralNetwork *nn) {
-    if (nn == NULL) return;
+    if (!nn) return;
 
-    for (int i = 0; i < nn->inputSize; i++) {
-        free(nn->hiddenWeights[i]);
-    }
+    for (int i = 0; i < nn->inputSize; i++) free(nn->hiddenWeights[i]);
+    for (int i = 0; i < nn->hiddenSize; i++) free(nn->outputWeights[i]);
+
     free(nn->hiddenWeights);
-
-    for (int i = 0; i < nn->hiddenSize; i++) {
-        free(nn->outputWeights[i]);
-    }
     free(nn->outputWeights);
-
     free(nn->hiddenBias);
     free(nn->outputBias);
     free(nn);
